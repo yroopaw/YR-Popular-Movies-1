@@ -1,6 +1,7 @@
 package com.example.android.popularmovies;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
@@ -13,10 +14,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.GridView;
 import android.widget.ImageView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -106,7 +109,18 @@ public class MovieFragment extends Fragment {
        // mMovieAdapter =  movieInfoAdapter(getContext());
         gridView.setAdapter(mMovieAdapter);
 
+        //For getting Toast or Detail View
+        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+       //     String movieName = mMovieAdapter.getItem(position);
+               // Toast.makeText(getActivity(), "Movie Clicked", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(getActivity(), DetailActivity.class).putExtra(Intent.EXTRA_TEXT, "Movie Clicked");
+                startActivity(intent);
 
+
+            }
+        });
 
         return rootView;
     }
@@ -128,8 +142,8 @@ public class MovieFragment extends Fragment {
 
             String movieJsonStr = null;
             String sortFormat = "popularity.desc";
-            
-            String apiId = "Not shared";
+
+            String apiId = "1aa14e3bc0a68048c86623e99ebc2240";
 
             try {
 
