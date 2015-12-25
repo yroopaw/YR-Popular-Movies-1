@@ -2,8 +2,12 @@ package com.example.android.popularmovies;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Movie;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Parcelable;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.text.format.Time;
@@ -66,64 +70,145 @@ public class MovieFragment extends Fragment {
         // Handle action bar
         int id = item.getItemId();
 
-        if (id == R.id.action_refresh) {
+      /*  if (id == R.id.action_refresh) {
             FetchMovieTask movieTask = new FetchMovieTask();
             movieTask.execute();
             return true;
-        }
+        }*/
 
         return super.onOptionsItemSelected(item);
 
-
     }
+
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_main, container, false);
 
-        //yy   mMovieAdapter  =
-        // yy       new ArrayAdapter<String>(
-        //yy          getActivity(), // The Currrent Context (this activity)
-        //yy      R.layout.list_item_movie, // The name of Layout id
-        //yy  R.id.list_item_forecast_imageview, // The id of ImageView to populate
-        //yy new ArrayList<String>());
 
-        movieInfo[] movieList = {
-                new movieInfo( "A", "B", 1.1, "C" , "http://i.imgur.com/BewnAhMb.jpg"),
-                new movieInfo( "D", "E", 2.1, "F" , "http://i.imgur.com/k6OTHWwb.jpg"),
-                new movieInfo( "H", "I", 3.1, "J" , "http://i.imgur.com/ZLQX8Jbb.jpg"),
-                new movieInfo( "L", "M", 4.1, "N" , "http://i.imgur.com/C8M1iSZb.jpg"),
-                new movieInfo( "P", "Q", 5.1, "R" , "http://i.imgur.com/BewnAhMb.jpg"),
-                new movieInfo( "T", "U", 6.1, "V" , "http://i.imgur.com/k6OTHWwb.jpg"),
-                new movieInfo( "Y", "Z", 7.1, "A" , "http://i.imgur.com/ZLQX8Jbb.jpg"),
-                new movieInfo( "C", "D", 8.1, "E" , "http://i.imgur.com/C8M1iSZb.jpg")
-
-        };
-
-        mMovieAdapter = new movieInfoAdapter(getActivity(), Arrays.asList(movieList));
-
+        mMovieAdapter = new movieInfoAdapter(getActivity(), new ArrayList<movieInfo>());
 
         //Get reference to Gridview and set adapter to it
         GridView gridView = (GridView) rootView.findViewById(R.id.gridview_movies);
-       // mMovieAdapter =  movieInfoAdapter(getContext());
+
         gridView.setAdapter(mMovieAdapter);
 
-        //For getting Toast or Detail View
+        //For getting Detail View
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
-       //     String movieName = mMovieAdapter.getItem(position);
-               // Toast.makeText(getActivity(), "Movie Clicked", Toast.LENGTH_SHORT).show();
-                Intent intent = new Intent(getActivity(), DetailActivity.class).putExtra(Intent.EXTRA_TEXT, "Movie Clicked");
+
+                movieInfo clickedMovie = mMovieAdapter.getItem(position);
+                Intent intent = new Intent(getActivity(), DetailActivity.class);
+                intent.putExtra("movieDetail", clickedMovie);
+
                 startActivity(intent);
-
-
             }
         });
 
+
+
         return rootView;
     }
+
+    @Override
+    public  void onStart() {
+        super.onStart();
+        FetchMovieTask movieTask = new FetchMovieTask();
+        movieTask.execute();
+    }
+
+    private movieInfo[] getMovieDataFromJson(String movieJsonStr)
+            throws JSONException {
+
+        //final String LOG_TAG = getMovieDataFromJson.class.getSimpleName();
+
+        final String LOG_TAG = "getMovieDataFromJson";
+
+        // These are the names of the JSON objects that need to be extracted.
+        final String MDB_RESULTS = "results";
+        final String MDB_ORIGINAL_TITLE = "original_title";
+        final String MDB_POSTER_PATH_THUMBNAIL = "poster_path";
+        final String MDB_PLOT_SYNOPSIS = "overview";
+        final String MDB_USER_RATING = "vote_average";
+        final String MDB_RELEASE_DATE = "release_date";
+
+        JSONObject movieJson = new JSONObject(movieJsonStr);
+        JSONArray movieArray = movieJson.getJSONArray(MDB_RESULTS);
+
+        movieInfo[] resultStrs = new movieInfo[movieArray.length()];
+
+        for(int i = 0; i < movieArray.length(); i++) {
+            // Get the JSON object representing the movie
+            JSONObject singleMovie = movieArray.getJSONObject(i);
+
+            resultStrs[i] =  new movieInfo (i,
+                                            singleMovie.getString(MDB_ORIGINAL_TITLE),
+                                            singleMovie.getString(MDB_PLOT_SYNOPSIS),
+                                            singleMovie.getDouble(MDB_USER_RATING),
+                                            singleMovie.getString(MDB_RELEASE_DATE),
+                                            singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL));
+             }
+
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        String sortType = pref.getString(getString(R.string.pref_sort_key), getString(R.string.pref_sort_popular));
+
+
+        if (sortType.equals(getString(R.string.pref_sort_popular)))
+        {
+            Log.v(LOG_TAG, "Sort: Order Popular");
+            resultStrs = sortByPopularity(resultStrs);
+        } else if  (sortType.equals(getString(R.string.pref_sort_highestrated))) {
+            Log.v(LOG_TAG, "Sort: Order Highest Rated");
+            resultStrs = sortByHighestRated(resultStrs);
+        } else {
+            Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
+        }
+
+        /*for (movieInfo s : resultStrs) {
+            Log.v(LOG_TAG, "Movie entry: " + s);
+        }*/
+        return resultStrs;
+
+    }
+
+    public static movieInfo[] sortByHighestRated(movieInfo[] movies) {
+        for (int i = 1; i < movies.length; i++) {
+            for (int j = 0; j < movies.length - i; j++) {
+                if (((movies[j].user_rating).compareTo((movies[j+1].user_rating))) < 0) {
+
+                    movieInfo temp = movies[j];
+                    movies[j] = movies[j + 1];
+                    movies[j + 1] = temp;
+                }
+            }
+        }
+        return movies;
+    }
+
+    public static movieInfo[] sortByPopularity(movieInfo[] movies) {
+        for (int i = 1; i < movies.length; i++) {
+            for (int j = 0; j < movies.length - i; j++) {
+                if ((movies[j].popularity) >((movies[j+1].popularity)))  {
+
+                    movieInfo temp = movies[j];
+                    movies[j] = movies[j + 1];
+                    movies[j + 1] = temp;
+                }
+            }
+        }
+        return movies;
+    }
+
+
+    // To display:
+    // original title -> original_title
+    // movie poster image thumbnail -> poster_path
+    // A plot synopsis (called overview in the api)
+    //  user rating (called vote_average in the api)
+    //  release date ->release_date
 
     public class FetchMovieTask extends AsyncTask<String, Void, movieInfo[]> {
 
@@ -142,8 +227,7 @@ public class MovieFragment extends Fragment {
 
             String movieJsonStr = null;
             String sortFormat = "popularity.desc";
-
-            String apiId = "1aa14e3bc0a68048c86623e99ebc2240";
+            String apiId = getString(R.string.api_key);
 
             try {
 
@@ -154,8 +238,21 @@ public class MovieFragment extends Fragment {
                 final String SORT_PARAM = "sort_by";
                 final String API_ID_PARAM = "api_key";
 
-                //  http://api.themoviedb.org/3/discover/movie? sort_by=popularity.desc&api_key=1aa14e3bc0a68048c86623e99ebc2240
 
+               /* SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
+                String sortType = pref.getString(getString(R.string.pref_sort_key), getString(R.string.pref_sort_popular));
+
+
+                if (sortType.equals(getString(R.string.pref_sort_popular)))
+                {
+                    Log.v(LOG_TAG, "Sort: Order Popular");
+                    sortFormat = "popularity.desc";
+                } else if  (sortType.equals(getString(R.string.pref_sort_highestrated))) {
+                    Log.v(LOG_TAG, "Sort: Order Highest Rated");
+                    sortFormat = "vote_average.desc";
+                } else {
+                    Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
+                }*/
 
                 Uri builtUri = Uri.parse(MOVIE_BASE_URL).buildUpon()
                         .appendQueryParameter(SORT_PARAM, sortFormat)
@@ -167,7 +264,7 @@ public class MovieFragment extends Fragment {
 
                 Log.v(LOG_TAG, "Built URI " + builtUri.toString());
 
-                // Create the request to OpenWeatherMap, and open the connection
+                // Create the request to MovieDB, and open the connection
                 urlConnection = (HttpURLConnection) url.openConnection();
                 urlConnection.setRequestMethod("GET");
                 urlConnection.connect();
@@ -236,92 +333,12 @@ public class MovieFragment extends Fragment {
         @Override
         protected void onPostExecute(movieInfo[] result) {
             if (result != null) {
-               mMovieAdapter.clear();
-               //nn mMovieAdapter.addAll(result);
-             //   mMovieAdapter = new movieInfoAdapter(getActivity(), Arrays.asList(result));
-
-
-
-
+                mMovieAdapter.clear();
                 for (movieInfo singleMovie : result) {
-                    //for (String dayForecastStr : result) {
                        mMovieAdapter.add(singleMovie);
-                        //   mForecastAdapter.add(dayForecastStr);
-                    }
                 }
             }
         }
-
-
-    // To display:
-    // original title -> original_title
-    // movie poster image thumbnail -> poster_path
-    // A plot synopsis (called overview in the api)
-    //  user rating (called vote_average in the api)
-    //  release date ->release_date
-
-    private movieInfo[] getMovieDataFromJson(String movieJsonStr)
-            throws JSONException {
-
-        //final String LOG_TAG = getMovieDataFromJson.class.getSimpleName();
-
-        final String LOG_TAG = "getMovieDataFromJson";
-
-        // These are the names of the JSON objects that need to be extracted.
-        final String MDB_RESULTS = "results";
-        final String MDB_ORIGINAL_TITLE = "original_title";
-        final String MDB_POSTER_PATH_THUMBNAIL = "poster_path";
-        final String MDB_PLOT_SYNOPSIS = "overview";
-        final String MDB_USER_RATING = "vote_average";
-        final String MDB_RELEASE_DATE = "release_date";
-
-        JSONObject movieJson = new JSONObject(movieJsonStr);
-        JSONArray movieArray = movieJson.getJSONArray(MDB_RESULTS);
-
-
-
-
-        movieInfo[] resultStrs = new movieInfo[movieArray.length()];
-        String arrayDelimeter = "#";
-
-        for(int i = 0; i < movieArray.length(); i++) {
-            // Use the following format of results data sorted by Popularity
-            //Delimeter is #, define in variable arrayDelimeter
-            // original_title#poster_path#overview#vote_average#release_date
-
-
-            // Get the JSON object representing the day
-            JSONObject singleMovie = movieArray.getJSONObject(i);
-
-
-
-           // JSONObject originalTitleObject = singleMovie.getJSONObject(MDB_ORIGINAL_TITLE);
-           // String original_title = singleMovie.getString(MDB_ORIGINAL_TITLE);
-           // String poster_path = singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL);
-
-
-           // resultStrs[i] = singleMovie.getString(MDB_ORIGINAL_TITLE) + arrayDelimeter +
-             //               singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL) + arrayDelimeter +
-               //             singleMovie.getString(MDB_PLOT_SYNOPSIS) + arrayDelimeter +
-                 //           singleMovie.getDouble(MDB_USER_RATING) + arrayDelimeter +
-                   //         singleMovie.getString(MDB_RELEASE_DATE);
-
-
-            resultStrs[i] =  new movieInfo (    singleMovie.getString(MDB_ORIGINAL_TITLE),
-                                                singleMovie.getString(MDB_PLOT_SYNOPSIS),
-                                                singleMovie.getDouble(MDB_USER_RATING),
-                                                singleMovie.getString(MDB_RELEASE_DATE),
-                                                singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL));
-
-            // resultStrs[i] = day + " - " + description + " - " + highAndLow;
-            //resultStrs[i] = original_title + arrayDelimeter + poster_path + arrayDelimeter + overview + arrayDelimeter + vote_average + arrayDelimeter + release_date;
-        }
-
-        for (movieInfo s : resultStrs) {
-            Log.v(LOG_TAG, "Movie entry: " + s);
-        }
-        return resultStrs;
-
     }
 }
 
