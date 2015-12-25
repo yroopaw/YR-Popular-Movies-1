@@ -152,7 +152,7 @@ public class MovieFragment extends Fragment {
                                             singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL));
              }
 
-        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
+        /*SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
         String sortType = pref.getString(getString(R.string.pref_sort_key), getString(R.string.pref_sort_popular));
 
 
@@ -165,7 +165,7 @@ public class MovieFragment extends Fragment {
             resultStrs = sortByHighestRated(resultStrs);
         } else {
             Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
-        }
+        }*/
 
         /*for (movieInfo s : resultStrs) {
             Log.v(LOG_TAG, "Movie entry: " + s);
@@ -239,7 +239,7 @@ public class MovieFragment extends Fragment {
                 final String API_ID_PARAM = "api_key";
 
 
-               /* SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
+               SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
                 String sortType = pref.getString(getString(R.string.pref_sort_key), getString(R.string.pref_sort_popular));
 
 
@@ -252,7 +252,7 @@ public class MovieFragment extends Fragment {
                     sortFormat = "vote_average.desc";
                 } else {
                     Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
-                }*/
+                }
 
                 Uri builtUri = Uri.parse(MOVIE_BASE_URL).buildUpon()
                         .appendQueryParameter(SORT_PARAM, sortFormat)
