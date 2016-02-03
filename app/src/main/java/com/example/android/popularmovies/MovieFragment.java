@@ -134,6 +134,7 @@ public class MovieFragment extends Fragment {
         final String MDB_PLOT_SYNOPSIS = "overview";
         final String MDB_USER_RATING = "vote_average";
         final String MDB_RELEASE_DATE = "release_date";
+        final String MDB_ID ="id";
 
         JSONObject movieJson = new JSONObject(movieJsonStr);
         JSONArray movieArray = movieJson.getJSONArray(MDB_RESULTS);
@@ -149,7 +150,8 @@ public class MovieFragment extends Fragment {
                                             singleMovie.getString(MDB_PLOT_SYNOPSIS),
                                             singleMovie.getDouble(MDB_USER_RATING),
                                             singleMovie.getString(MDB_RELEASE_DATE),
-                                            singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL));
+                                            singleMovie.getString(MDB_POSTER_PATH_THUMBNAIL),
+                                            singleMovie.getString(MDB_ID));
              }
 
         /*SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(getActivity());
@@ -203,12 +205,7 @@ public class MovieFragment extends Fragment {
     }
 
 
-    // To display:
-    // original title -> original_title
-    // movie poster image thumbnail -> poster_path
-    // A plot synopsis (called overview in the api)
-    //  user rating (called vote_average in the api)
-    //  release date ->release_date
+
 
     public class FetchMovieTask extends AsyncTask<String, Void, movieInfo[]> {
 

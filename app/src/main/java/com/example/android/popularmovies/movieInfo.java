@@ -14,14 +14,17 @@ public class movieInfo implements Parcelable{
     Double user_rating ;
     String release_date;
     String poster_path_thumbnail ;
+    String id;
 
-    public movieInfo(int vPopularity, String vTitle,  String vSynopsis, Double vRating, String vReleasedate, String vPoster) {
+    public movieInfo(int vPopularity, String vTitle,  String vSynopsis, Double vRating,
+                     String vReleasedate, String vPoster, String vId) {
         this.popularity = vPopularity;
         this.original_title =  vTitle;
         this.plot_synopsis = vSynopsis;
         this.user_rating = vRating;
         this.release_date = vReleasedate;
         this.poster_path_thumbnail = vPoster;
+        this.id = vId;
     }
 
     private movieInfo(Parcel in) {
@@ -31,6 +34,7 @@ public class movieInfo implements Parcelable{
         user_rating = in.readDouble();
         release_date = in.readString();
         poster_path_thumbnail = in.readString();
+        id = in.readString();
     }
 
     @Override
@@ -44,6 +48,7 @@ public class movieInfo implements Parcelable{
         parcel.writeDouble(user_rating) ;
         parcel.writeString(release_date);
         parcel.writeString(poster_path_thumbnail) ;
+        parcel.writeString(id);
 
     }
 
