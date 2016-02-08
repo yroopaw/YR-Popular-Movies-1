@@ -12,27 +12,44 @@ import android.view.MenuItem;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final String DETAILACTIVTYFRAGMENT_TAG = "DFTAG";
+    private boolean mTwoPane;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
+
+       Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
-//        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-//        fab.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View view) {
-//                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-//                        .setAction("Action", null).show();
-//            }
-//        });
+        if (findViewById(R.id.movie_detail_container) != null) {
+            // The detail container view will be present only in the large-screen layouts(res/layout-sw600dp).
+            //  If this view is present, then the activity should be in two-pane mode.
+
+            mTwoPane = true;
+
+            // In two-pane mode, show the detail view in this activity by adding or
+            // replacing the detail fragment using a fragment transaction.
+
+            if (savedInstanceState == null) {
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.movie_detail_container, new DetailActivityFragment(), DETAILACTIVTYFRAGMENT_TAG)
+                        .commit();
+            } else {
+                mTwoPane = false;
+            }
+
+        }
+
     }
+
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
+        getMenuInflater().inflate(R.menu.menu_main, menu); //explode detail_menu
         return true;
     }
 
@@ -51,4 +68,6 @@ public class MainActivity extends AppCompatActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
+
 }

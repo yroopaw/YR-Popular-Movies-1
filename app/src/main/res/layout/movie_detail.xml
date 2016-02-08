@@ -4,10 +4,11 @@
     android:layout_height="match_parent"
     tools:context=".DetailActivity">
 
-    <ListView
+    <TextView
         android:id="@+id/list_movie_detail"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:text="Showing movie_detail  view"
         android:divider="@null" />
 
 </FrameLayout>
