@@ -8,7 +8,9 @@
 
     <string name="title_activity_detail">DetailActivity</string>
     <string name="title_activity_settings">Settings</string>
-    <string name="poster_resolution">w342</string>
+    <string name="poster_resolution">w185</string>
+    <string name="poster_resolution_one_pane">w342</string>
+    <string name="poster_resolution_two_pane">w185</string>
     <string name ="api_key">1aa14e3bc0a68048c86623e99ebc2240</string>
 
     <!--Strings for Settings Sort Order -->

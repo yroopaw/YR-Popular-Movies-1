@@ -50,8 +50,8 @@
         </activity>
 
         <provider
-            android:authorities="com.example.android.popularmovies"
-            android:name=".data.MovieProvider" />
+            android:name=".data.MovieProvider"
+            android:authorities="com.example.android.popularmovies" />
 
 
     </application>

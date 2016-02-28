@@ -24,20 +24,20 @@ public class DetailActivity extends AppCompatActivity {
             // using a fragment transaction.
 
             Bundle arguments = new Bundle();
-           // arguments.putParcelable(DetailFragment.DETAIL_URI, getIntent().getData());
+            arguments.putParcelable(DetailActivityFragment.DETAIL_URI, getIntent().getData());
 
-         //   DetailActivityFragment fragment = new DetailActivityFragment();
+            DetailActivityFragment fragment = new DetailActivityFragment();
 
-            getSupportFragmentManager().beginTransaction().
-                    add(R.id.movie_detail_container, new DetailActivityFragment())
+            //   getSupportFragmentManager().beginTransaction().
+            //         add(R.id.movie_detail_container, new DetailActivityFragment())
+            //        .commit();
+
+
+            fragment.setArguments(arguments);
+
+            getSupportFragmentManager().beginTransaction()
+                    .add(R.id.movie_detail_container, fragment)
                     .commit();
-
-
-         //   fragment.setArguments(arguments);
-
-       //     getSupportFragmentManager().beginTransaction()
-        //            .add(R.id.weather_detail_container, fragment)
-          //          .commit();
         }
       //yy  Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar); //This is not avaibale in activity_detail
         //yy setSupportActionBar(toolbar);

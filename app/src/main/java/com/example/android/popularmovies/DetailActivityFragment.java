@@ -1,14 +1,19 @@
 package com.example.android.popularmovies;
 
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import android.os.Bundle;
+import android.support.v4.app.LoaderManager;
 import android.support.v4.view.MenuItemCompat;
-import android.support.v7.app.ActionBarActivity;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.ShareActionProvider;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -17,17 +22,14 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
+import android.widget.AdapterView;
+import android.widget.ListView;
 import android.widget.Toast;
 
+import com.example.android.popularmovies.data.MovieContract;
 import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
-import com.squareup.picasso.Picasso;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,49 +41,105 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+
+import static android.database.DatabaseUtils.dumpCursorToString;
 
 /**
  * A placeholder fragment containing a simple view.
  */
 public class DetailActivityFragment extends Fragment{
 
+    //Added for Cusor Loader
+    static final String DETAIL_URI = "URI";
+    // These indices are tied to MOVIE_LIST_COLUMNS.  If MOVIE_LIST_COLUMNS changes, these must change.
+    static final int COL_INDEX_ID = 0; // this for default column _ID
+    static final int COL_MOVIE_ID = 1;
+    static final int COL_POPULARITY = 2;
+    static final int COL_ORIGINAL_TITLE = 3;
+    static final int COL_PLOT_SYNOPSIS = 4;
+    static final int COL_USER_RATING = 5;
+    static final int COL_RELEASE_DATE = 6;
+    static final int COL_POSTER_PATH_THUMBNAIL = 7;
     private static final String LOG_TAG = DetailActivityFragment.class.getSimpleName();
-    private trailerReviewsAdapter mtrailerReviewsAdapter;
-    private GoogleApiClient client;
-    private String movieId = null;
-    FetchTrailerTask mTrailerTask;
-    ViewGroup mScrollContent;
-    private trailerReviews[] mHeader = new trailerReviews[1];
-    // private trailerReviews[] mTrailer= new trailerReviews[1]; // To remove static count  of items after Async Problem is fixed
-    // private trailerReviews[] mReviews= new trailerReviews[2]; // To remove static count  of items after Async Problem is fixed
-    //private trailerReviews[] mTrailer;
-    //private trailerReviews[] mReviews;
-
-    private trailerReviews[] mtrailerReviews = new trailerReviews[3]; // To remove static count  of items after Async Problem is fixed
+    //Added for Sharing Functionality
+    private static final String TRAILER_SHARE_HASTAG = " #PopularMoviesApp";
+    private static final int DETAIL_LOADER = 0;
     int DETAIL_HEADER = 0;
     int TRAILER = 1;
     int REVIEW = 2;
-
-    //Test Data remove after asyn issue is fixed
-    private trailerReviews[] mTrailer = {new trailerReviews (TRAILER, "sGbxmsDFVnE", "YouTube", "Official Trailer")};
-
-    private trailerReviews[] mReviews = {new trailerReviews(REVIEW, "5675fd7792514179e7003dc5", "http://j.mp/1ODjyR4", "Frank Ochieng")};
-    //                                      new trailerReviews(REVIEW,"569bd8d7c3a36858c800046d","http://j.mp/1n4KbYz","bodokh")};
-
-    //Test Data ends
-
-    //Added for Sharing Functionality
-    private static final String TRAILES_SHARE_HASTAG = " #PopularMoviesApp";
-    private String mTrailerStr;
-
+    private trailerReviewsAdapter mtrailerReviewsAdapter;
+    private GoogleApiClient client;
+    private String mMovieId = null;
+    private String mShareTrailerStr;
+    //Added for Loader
+    private ShareActionProvider mShareActionProvider;
+    private movieInfo mclickedMovie;
+    private Uri mUri;
+    private ListView mListView;
+    private Cursor mMovieCursor;
 
     public DetailActivityFragment() {
         setHasOptionsMenu(true);
     }
 
+
+    // Fragment is added
+    //                                  ------------------------------------------------------------------
+    //                                  |                                                                |
+    //                                  V                                                                |
+    // onAttach() -> onCreate() -> OnCreateView() -> onActivityCreated() -> onStart() -> onResume()      |
+    // Fragment is Active                                                                                |
+    // When user navigates backward or fragment is removed  /replaced                                    |
+    // The fragment is added to the back stack, then removed/replaced                                    |
+    // onPause() -> on Stop() - > onDestroyView() --fragment returns to the layout from the back stack----
+    //                                  |
+    //                                  V
+    //                            onDestroy() -> onDetach()
+    // Fragment is Destroyed
+
+    public static Uri getUriBasedOnPreferredSortOrder(Context context) {
+
+        Uri sortOrderDbUri = MovieContract.MovieListEntry.buildMovieListUri();
+
+        SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(context);
+        String sortType = pref.getString(context.getString(R.string.pref_sort_key), context.getString(R.string.pref_sort_popular));
+
+        if (sortType.equals(context.getString(R.string.pref_sort_popular))) {
+
+            sortOrderDbUri = MovieContract.MovieListEntry.buildMovieListUri();
+
+        } else if (sortType.equals(context.getString(R.string.pref_sort_highestrated))) {
+
+            sortOrderDbUri = MovieContract.HighestRatedMovies.buildMovieListUri();
+
+        } else if (sortType.equals(context.getString(R.string.pref_sort_favourite))) {
+
+
+            sortOrderDbUri = MovieContract.FavoriteMovies.buildMovieListUri();
+
+            Cursor cur = context.getContentResolver().query(sortOrderDbUri,
+                    null, null, null, null);
+
+            if (cur != null && cur.getCount() == 0) {
+                Log.v(LOG_TAG, "Hard code sort order if favorite is empty");
+                sortOrderDbUri = MovieContract.MovieListEntry.buildMovieListUri();
+            }
+
+
+            //original    sortOrderDbUri = MovieContract.FavoriteMovies.buildMovieListUri();
+
+        } else {
+            Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
+        }
+
+
+        return sortOrderDbUri;
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        //zz  Bundle arguments = getArguments();
         super.onCreate(savedInstanceState);
 
         setHasOptionsMenu(true);
@@ -97,61 +155,90 @@ public class DetailActivityFragment extends Fragment{
         client = new GoogleApiClient.Builder(getActivity()).addApi(AppIndex.API).build();
     }
 
-
     @Override
-    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-       // getMenuInflater().inflate(R.menu.menu_detail, menu);
-        inflater.inflate(R.menu.detailfragment, menu);
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
 
-        MenuItem menuItem = menu.findItem(R.id.action_share);
-        ShareActionProvider mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
+        Bundle arguments = getArguments();
+
+        if (arguments != null) {
+            mUri = arguments.getParcelable(DetailActivityFragment.DETAIL_URI);
+            mMovieCursor = Utility.getMovieDetailsByUri(getActivity(), mUri);
+
+            if (mMovieCursor != null && mMovieCursor.moveToFirst()) {
+                mMovieId = mMovieCursor.getString(COL_MOVIE_ID);
+                Log.v(LOG_TAG, " Detail Movie Cursor " + dumpCursorToString(mMovieCursor));
+                Log.v(LOG_TAG, " Detail MovieId Cursor " + mMovieId);
+                //   mMovieCursor.close();
+            }
+        }
+
+        FetchTrailerTask trailerTask = new FetchTrailerTask(this);
+        trailerTask.execute();
 
         if (mShareActionProvider != null) {
             mShareActionProvider.setShareIntent(createShareTrailerIntent());
         }
-        else {
-            Log.d(LOG_TAG, "Share Action Provider is null?");
-        }
-    }
 
-    private Intent createShareTrailerIntent() {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT, mTrailerStr + TRAILES_SHARE_HASTAG);
-        return shareIntent;
+        mtrailerReviewsAdapter = new trailerReviewsAdapter(getActivity(), new ArrayList<trailerReviews>());
+
+        View rootView = inflater.inflate(R.layout.fragment_detail, container, false);
+
+        mListView = (ListView) rootView.findViewById(R.id.detail_scroll);
+        mListView.setAdapter(mtrailerReviewsAdapter);
+
+        mListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int position, long l) {
+
+                trailerReviews trailerReviewData = (trailerReviews) adapterView.getItemAtPosition(position);
+
+                //    Toast.makeText(getActivity(), "Item at Position #" + trailerReviewData.id + "# Clicked.", Toast.LENGTH_SHORT).show();
+
+                if (trailerReviewData != null && trailerReviewData.type == TRAILER) {
+
+                    String videoUrl = "https://www.youtube.com/watch?v=" + trailerReviewData.id;
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(videoUrl));
+
+                    if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+                        startActivity(intent);
+                    } else {
+                        Log.d("trailer Play:", "Couldn't call " + videoUrl + ", no receiving apps installed!");
+                    }
+                }
+                if (trailerReviewData != null && trailerReviewData.type == REVIEW) {
+
+                    String reviewUrl = trailerReviewData.url;
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(reviewUrl));
+
+                    if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
+                        startActivity(intent);
+                    } else {
+                        Log.d("trailer Play:", "Couldn't call " + reviewUrl + ", no receiving apps installed!");
+                    }
+                }
+            }
+        });
+
+        return rootView;
 
     }
 
     @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
-            startActivity(new Intent(getActivity(), SettingsActivity.class));
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
+    public void onActivityCreated(Bundle savedInstanceState) {
+        //aa getLoaderManager().initLoader(DETAIL_LOADER, null, this);
+        super.onActivityCreated(savedInstanceState);
     }
 
     @Override
     public void onStart() {
         super.onStart();
-      /*  FetchTrailerTask trailerTask = new FetchTrailerTask();
-        trailerTask.execute();
 
-        FetchReviewTask reviewTask = new FetchReviewTask();
-        reviewTask.execute();*/
 
         // ATTENTION: This was auto-generated to implement the App Indexing API.
         // See https://g.co/AppIndexing/AndroidStudio for more information.
-        Log.v("OnStart", "OnStart: " + mtrailerReviews);
+
 
         client.connect();
         Action viewAction = Action.newAction(
@@ -190,296 +277,81 @@ public class DetailActivityFragment extends Fragment{
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        // getMenuInflater().inflate(R.menu.menu_detail, menu);
+        inflater.inflate(R.menu.detailfragment, menu);
 
-        View rootView = inflater.inflate(R.layout.fragment_detail, container, false);
+        MenuItem menuItem = menu.findItem(R.id.action_share);
+        //Loader  ShareActionProvider mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
+        mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(menuItem);
 
-        // The detail Activity called via intent.  Inspect the intent for movie data.
-        Intent intent = getActivity().getIntent();
-        if (intent != null && intent.hasExtra("movieDetail")) {
-
-
-            movieInfo clickedMovie = intent.getParcelableExtra("movieDetail");
-
-            movieId = clickedMovie.id;
-            startTrailerReviewFetch();
-
-            //Build URl for the Poster Thumbnail
-
-            final String POSTER_BASE_URL = "http://image.tmdb.org/t/p/";
-            String posterUrl = POSTER_BASE_URL + this.getString(R.string.poster_resolution)
-                    + "/" + clickedMovie.poster_path_thumbnail;
-
-            Button favButton= (Button) rootView.findViewById(R.id.fav_button);
-            favButton.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    favouriteButtonClicked(v);
-                }
-            });
-
-
-
-            mHeader[0] =   new trailerReviews (
-                    DETAIL_HEADER,
-                    clickedMovie.release_date.substring(0, 4),
-                    posterUrl,
-                    clickedMovie.original_title);
-
-
-            ((TextView) rootView.findViewById(R.id.v_original_title))
-                    .setText(clickedMovie.original_title);
-
-
-            ImageView movieThumbnail = (ImageView) rootView.findViewById(R.id.v_poster_thumbnail);
-            Picasso.with(getActivity()).load(posterUrl).into(movieThumbnail);
-
-
-
-
-
-            ((TextView) rootView.findViewById(R.id.v_release_date))
-                    .setText(clickedMovie.release_date.substring(0, 4));
-
-            ((TextView) rootView.findViewById(R.id.v_user_rating))
-                    .setText(clickedMovie.user_rating.toString() + "/10");
-
-            ((TextView) rootView.findViewById(R.id.v_plot_synopsis))
-                    .setText(clickedMovie.plot_synopsis);
-
-
-
-
-
-
-
-            ((TextView) rootView.findViewById(R.id.v_duration)).setText(clickedMovie.id);
-
-
-
-            //    setContentView(R.layout.fragment_detail);
-            mScrollContent = (ViewGroup) rootView.findViewById(R.id.scroll_content);
-            addTrailerReviewsView(mScrollContent);
-
-            if (mTrailer[0] != null) {
-                mTrailerStr = mTrailer[0].id;
-                mTrailerStr = "https://www.youtube.com/watch?v=sGbxmsDFVnE";
-            }
-
-
+        if (mShareActionProvider != null) {
+            //  if(mclickedMovie != null) {
+            mShareActionProvider.setShareIntent(createShareTrailerIntent());
         }
-        Log.v("ONcreateView", "Create View : " + mtrailerReviews);
-        return rootView;
-
-
-        //return inflater.inflate(R.layout.fragment_detail, container, false);
+        else {
+            Log.d(LOG_TAG, "Share Action Provider is null?");
+        }
     }
 
-    //Add for prograss bar
-    protected void startTrailerReviewFetch() {
-        mTrailerTask = new FetchTrailerTask(this);
-        mTrailerTask.execute();
+    private Intent createShareTrailerIntent() {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, mShareTrailerStr + TRAILER_SHARE_HASTAG);
+        return shareIntent;
+
+    }
+
+    void onSortOrderChanged() {
+        // replace the uri, since the sort order has changed
+        mUri = Utility.getUriOfFirstMovieInPreferredSortOrder(getContext());
+        if (null != mUri) {
+
+            //   Uri updatedUri = MovieContract.MovieListEntry.buildMovieListSort(newSortType);
+            //  Uri updatedUri = getUriBasedOnPreferredSortOrder(getContext());
+            //  mUri = updatedUri;
+            Log.v(LOG_TAG, "XYZ Entered detail activity sort order" + mUri);
+            //  getLoaderManager().restartLoader(DETAIL_LOADER, null, this);
+        }
+
+
+    }
+
+    void onSortOrderChanged1(String newSortType) {
+        // replace the uri, since the location has changed
+        Uri uri = mUri;
+        if (null != uri) {
+
+            //   Uri updatedUri = MovieContract.MovieListEntry.buildMovieListSort(newSortType);
+            Uri updatedUri = getUriBasedOnPreferredSortOrder(getContext());
+            mUri = updatedUri;
+            Log.v(LOG_TAG, "XYZ Entered detail activity sort order" + mUri);
+            //  getLoaderManager().restartLoader(DETAIL_LOADER, null, this);
+        }
+
+
     }
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        //Sync UI state to current fragment and task state
-        if (isTaskRunning(mTrailerTask)) {
-            showProgressBar();
-        }
-        else {
-            hideProgressBar();
-        }
-        if (mTrailer != null){
-            populateResult(mTrailer);
-        }
-        super.onActivityCreated(savedInstanceState);
-    }
+    public boolean onOptionsItemSelected(MenuItem item) {
+        // Handle action bar item clicks here. The action bar will
+        // automatically handle clicks on the Home/Up button, so long
+        // as you specify a parent activity in AndroidManifest.xml.
+        int id = item.getItemId();
 
-    public void showProgressBar() {
-
-      /*  View dynamicLayout = LayoutInflater.from(getActivity()).inflate(R.layout.trailer_review_item, mScrollContent, false);
-        dynamicLayout.setVisibility(View.GONE);
-        View progressBarLayout = LayoutInflater.from(getActivity()).inflate(R.layout.progress_bar, mScrollContent, false);
-        progressBarLayout.setVisibility(View.VISIBLE);
-        ProgressBar progress =(ProgressBar) progressBarLayout.findViewById(R.id.progressBarFetch);
-        progress.setVisibility(View.VISIBLE);
-        progress.setIndeterminate(true);*/
-    }
-
-    public void hideProgressBar() {
-
-      /*  View dynamicLayout = LayoutInflater.from(getActivity()).inflate(R.layout.trailer_review_item, mScrollContent, false);
-        dynamicLayout.setVisibility(View.VISIBLE);
-        View progressBarLayout = LayoutInflater.from(getActivity()).inflate(R.layout.progress_bar, mScrollContent, false);
-        progressBarLayout.setVisibility(View.GONE);
-        ProgressBar progress =(ProgressBar) progressBarLayout.findViewById(R.id.progressBarFetch);
-        progress.setVisibility(View.GONE);*/
-    }
-
-    public void populateResult(trailerReviews[] s) {
-       // TextView resultView = (TextView) getActivity().findViewById(R.id.textUrrlContent);
-      //  resultView.setText(s);
-
-          if (mTrailer != null) {
-
-                    for (int i = 0; i < mTrailer.length; i++) {
-                        mTrailer[i] = null;
-                    }
-                }
-                //   mtrailerReviews.clear();
-                mTrailer = s;
-
-    }
-
-    protected boolean isTaskRunning(FetchTrailerTask task) {
-
-        if (task == null) {
-            return false;
-        } else if (task.getStatus() == FetchReviewTask.Status.FINISHED) {
-            return false;
-        } else {
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.action_settings) {
+            startActivity(new Intent(getActivity(), SettingsActivity.class));
             return true;
         }
-    }
 
-    private void favouriteButtonClicked(View v) {
-        //TODO update movie record in Database as favourite
-
-        Log.v("Fav Button", "Fav Button Clicked");
-
-        Toast.makeText(getActivity(), "Movie Marked As Favourite", Toast.LENGTH_SHORT).show();
-
-    }
-
-    private void addTrailerReviewsView(ViewGroup mScrollContent) {
-        // This test dat is created since Async Task is not providing the data
-
-     /*  mTrailer[0] =   new trailerReviews (
-                TRAILER,
-                "sGbxmsDFVnE",
-                "YouTube",
-                "Official Trailer");
-
-        mReviews[0] =new trailerReviews(
-                REVIEW,
-                "5675fd7792514179e7003dc5",
-                "http://j.mp/1ODjyR4",
-                "Frank Ochieng");
-
-        mReviews[1] =new trailerReviews(
-                REVIEW,
-                "569bd8d7c3a36858c800046d",
-                "http://j.mp/1n4KbYz",
-                "bodokh");*/
-
-
-        //End of Test Data
-
-        if (mTrailer.length >= 1) {
-
-            TextView trailerLabel = new TextView(getActivity());
-            trailerLabel.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            trailerLabel.setPadding(48, 8, 16, 8);
-            trailerLabel.setTextSize(16);
-            trailerLabel.setText("Trailers:");
-            mScrollContent.addView(trailerLabel);
-
-        }
-
-        for(int i=0; i < mTrailer.length; i++) {
-            View dynamicLayout = LayoutInflater.from(getActivity()).inflate(R.layout.trailer_review_item, mScrollContent, false);
-            Button dynamicButton = (Button) dynamicLayout.findViewById(R.id.trailer_review_button);
-            dynamicButton.setId(i+101);
-            dynamicButton.setOnClickListener(trailerButtonClicked);
-            TextView dynamicText = (TextView) dynamicLayout.findViewById(R.id.trailer_review_text);
-            dynamicButton.setText(getString(R.string.play_trailer));
-            dynamicText.setText(mTrailer[i].name_Author);
-            mScrollContent.addView(dynamicLayout);
-
-            View lineView = new View(getActivity());
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 4);
-            params.setMargins(48, 16, 48, 16);
-            lineView.setLayoutParams(params);
-            lineView.setBackgroundColor(Color.parseColor("#B3B3B3")); // darker_gray
-            mScrollContent.addView(lineView);
-
-        }
-
-        if (mReviews.length >= 1) {
-
-            TextView reviewsLabel = new TextView(getActivity());
-            reviewsLabel.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            reviewsLabel.setPadding(48, 8, 16, 8);
-            reviewsLabel.setTextSize(16);
-            reviewsLabel.setText("Reviews:");
-            mScrollContent.addView(reviewsLabel);
-        }
-
-        for(int i=0; i < mReviews.length; i++) {
-            View dynamicLayout = LayoutInflater.from(getActivity()).inflate(R.layout.trailer_review_item, mScrollContent, false);
-            Button dynamicButton = (Button) dynamicLayout.findViewById(R.id.trailer_review_button);
-            dynamicButton.setId(i+1001);
-            dynamicButton.setOnClickListener(reviewButtonClicked);
-            TextView dynamicText = (TextView) dynamicLayout.findViewById(R.id.trailer_review_text);
-            dynamicButton.setText(getString(R.string.read_review));
-            dynamicText.setText("Review By: " + mReviews[i].name_Author);
-            mScrollContent.addView(dynamicLayout);
-
-            View lineView = new View(getActivity());
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 4);
-            params.setMargins(48, 16, 48, 16);
-            lineView.setLayoutParams(params);
-            lineView.setBackgroundColor(Color.parseColor("#B3B3B3")); // darker_gray
-            mScrollContent.addView(lineView);
-        }
-
+        return super.onOptionsItemSelected(item);
     }
 
 
-    View.OnClickListener trailerButtonClicked = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-
-            int trailerNo = v.getId() -101;
-            Log.v("Trailer Button", "Trailer Button Clicked URL: " + mTrailer[trailerNo]);
-
-            String videoUrl = "https://www.youtube.com/watch?v=" + "sGbxmsDFVnE";
-         //   String videoUrl = "https://www.youtube.com/watch?v=" + mTrailer[trailerNo].id;
-
-
-            Intent intent = new Intent(Intent.ACTION_VIEW,Uri.parse(videoUrl));
-
-            if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
-                           startActivity(intent);
-            } else {
-                Log.d("trailer Play:", "Couldn't call " + videoUrl + ", no receiving apps installed!");
-            }
-
-        }
-    };
-
-    View.OnClickListener reviewButtonClicked = new View.OnClickListener() {
-        @Override
-        public void onClick(View v) {
-
-            int reviewNo = v.getId() -1001;
-            Log.v("Review Button", "Review Button Clicked URL: " + mReviews[reviewNo]);
-            String reviewUrl = "http://j.mp/1ODjyR4";
-            //   String videoUrl =   mReviews[reviewNo].id;
-
-
-            Intent intent = new Intent(Intent.ACTION_VIEW,Uri.parse(reviewUrl));
-
-            if (intent.resolveActivity(getActivity().getPackageManager()) != null) {
-                startActivity(intent);
-            } else {
-                Log.d("Review:", "Couldn't call " + reviewUrl + ", no receiving apps installed!");
-            }
-
-        }
-    };
+// Fetch Trailer and Review Background Task start here
 
     private trailerReviews[] getTrailerDataFromJson(String trailerJsonStr)
             throws JSONException {
@@ -495,25 +367,91 @@ public class DetailActivityFragment extends Fragment{
         final String TRLR_SITE = "site";
         final String TRLR_NAME = "name";
 
-
         JSONObject trailerJson = new JSONObject(trailerJsonStr);
         JSONArray trailerArray = trailerJson.getJSONArray(TRLR_RESULTS);
 
-        trailerReviews[] resultStrs = new trailerReviews[trailerArray.length()];
+        trailerReviews[] resultStrs = new trailerReviews[trailerArray.length() + 1];
 
-        for (int i = 0; i < trailerArray.length(); i++) {
+        if (mMovieCursor != null && mMovieCursor.moveToFirst()) {
+
+            Log.v(LOG_TAG, " Detail Movie Cursor " + dumpCursorToString(mMovieCursor));
+            Log.v(LOG_TAG, " Detail MovieId Cursor " + mMovieId);
+
+            Log.v(LOG_TAG, " Detail TrMovie Cursor " + dumpCursorToString(mMovieCursor));
+            resultStrs[0] = new trailerReviews(
+                    DETAIL_HEADER,
+                    null,
+                    null,
+                    null,
+                    mMovieCursor.getInt(COL_POPULARITY),
+                    mMovieCursor.getString(COL_ORIGINAL_TITLE),
+                    mMovieCursor.getString(COL_PLOT_SYNOPSIS),
+                    mMovieCursor.getDouble(COL_USER_RATING),
+                    mMovieCursor.getString(COL_RELEASE_DATE),
+                    mMovieCursor.getString(COL_POSTER_PATH_THUMBNAIL),
+                    mMovieCursor.getString(COL_MOVIE_ID));
+            mMovieCursor.close();
+        }
+
+        for (int i = 1; i < (trailerArray.length() + 1); i++) {
             // Get the JSON object representing the movie
-            JSONObject singleTrailer = trailerArray.getJSONObject(i);
+            JSONObject singleTrailer = trailerArray.getJSONObject(i - 1);
+
+            //Populate String for Sharing String first Trailer
+            if (i == 1) {
+
+                mShareTrailerStr = "Check out this interesting Movie " + "https://www.youtube.com/watch?v=" + singleTrailer.getString(TRLR_KEY);
+
+                Log.v(LOG_TAG, " Share TrailerStr " + mShareTrailerStr);
+            }
 
 
             resultStrs[i] = new trailerReviews(
                     TRAILER,
                     singleTrailer.getString(TRLR_KEY),
                     singleTrailer.getString(TRLR_SITE),
-                    singleTrailer.getString(TRLR_NAME));
+                    singleTrailer.getString(TRLR_NAME),
+                    0, null, null, 0.0, null, null, null);
+            Log.v(LOG_TAG, "TTY trailer info returned : " + singleTrailer);
 
         }
 
+
+        return resultStrs;
+
+    }
+
+    private trailerReviews[] getReviewDataFromJson(String reviewJsonStr)
+            throws JSONException {
+
+        //final String LOG_TAG = getMovieDataFromJson.class.getSimpleName();
+
+        final String LOG_TAG = "getReviewDataFromJson";
+
+        // These are the names of the JSON objects that need to be extracted.
+        final String RVW_RESULTS = "results";
+        final String RVW_TYPE = "type";
+        final String RVW_ID = "id";
+        final String RVW_URL = "url";
+        final String RVW_AUTHOR = "author";
+
+
+        JSONObject reviewJson = new JSONObject(reviewJsonStr);
+        JSONArray reviewArray = reviewJson.getJSONArray(RVW_RESULTS);
+
+        trailerReviews[] resultStrs = new trailerReviews[reviewArray.length()];
+
+        for (int i = 0; i < reviewArray.length(); i++) {
+            // Get the JSON object representing the movie
+            JSONObject singleReview = reviewArray.getJSONObject(i);
+
+            resultStrs[i] = new trailerReviews(
+                    REVIEW,
+                    singleReview.getString(RVW_ID),
+                    singleReview.getString(RVW_URL),
+                    singleReview.getString(RVW_AUTHOR),
+                    0, null, null, 0.0, null, null, null);
+        }
 
         return resultStrs;
 
@@ -555,7 +493,7 @@ public class DetailActivityFragment extends Fragment{
 
 
                 Uri builtUri = Uri.parse(MOVIE_BASE_URL).buildUpon()
-                        .appendPath(movieId)
+                        .appendPath(mMovieId)
                         .appendPath(TRAILER_PARAM)
                         .appendQueryParameter(API_ID_PARAM, apiId)
                         .build();
@@ -635,93 +573,30 @@ public class DetailActivityFragment extends Fragment{
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            container.showProgressBar();
+
 
         }
 
         @Override
         protected void onPostExecute(trailerReviews[] result) {
+
             if (result != null) {
-
-                if (container != null && container.getActivity() != null) {
-
-populateResult(result);
-                container.populateResult(result);
-                    container.hideProgressBar();
-                    this.container = null;
-              /*y1  if (mTrailer != null) {
-
-                    for (int i = 0; i < mTrailer.length; i++) {
-                        mTrailer[i] = null;
-                    }
+                mtrailerReviewsAdapter.clear();
+                for (trailerReviews singleTrailer : result) {
+                    mtrailerReviewsAdapter.add(singleTrailer);
                 }
-                //   mtrailerReviews.clear();
-                mTrailer = result; */
-
-
-
-                //       for (reviewInfo singleTrailer : result) {
-                //      mtrailerReviews.add(singleTrailer);
-                //  }
-
-            /*   if (mTrailer != null) {
-                    mtrailerReviewsAdapter.clear();
-                    for (trailerReviews singletrailerReview : mTrailer) {
-                        mtrailerReviewsAdapter.add(singletrailerReview);
-                    }
-                }*/
             }
-        }
-
-        }
-    }
 
 
-    public trailerReviews[] concat(trailerReviews[] firstArray, trailerReviews[] secondArray, trailerReviews[] thirdArray) {
-        int aLen = firstArray.length;
-        int bLen = secondArray.length;
-        int cLen = thirdArray.length;
+            Log.v("Post Execute Trailer", "Count of Trailer items = " + result.length);
 
-        trailerReviews[] resultArray = new trailerReviews[aLen + bLen + cLen];
-        System.arraycopy(firstArray, 0, resultArray, 0, aLen);
-        System.arraycopy(secondArray, 0, resultArray, aLen, bLen);
-        System.arraycopy(thirdArray, 0, resultArray, aLen + bLen, cLen);
-        return resultArray;
-    }
+            mtrailerReviewsAdapter.notifyDataSetChanged();
+            int yy = result.length;
 
-    private trailerReviews[] getReviewDataFromJson(String reviewJsonStr)
-            throws JSONException {
+            new FetchReviewTask().execute();
 
-        //final String LOG_TAG = getMovieDataFromJson.class.getSimpleName();
+            }
 
-        final String LOG_TAG = "getReviewDataFromJson";
-
-        // These are the names of the JSON objects that need to be extracted.
-        final String RVW_RESULTS = "results";
-        final String RVW_TYPE = "type";
-        final String RVW_ID = "id";
-        final String RVW_URL = "url";
-        final String RVW_AUTHOR = "author";
-
-
-        JSONObject reviewJson = new JSONObject(reviewJsonStr);
-        JSONArray reviewArray = reviewJson.getJSONArray(RVW_RESULTS);
-
-        trailerReviews[] resultStrs = new trailerReviews[reviewArray.length()];
-
-        for (int i = 0; i < reviewArray.length(); i++) {
-            // Get the JSON object representing the movie
-            JSONObject singleReview = reviewArray.getJSONObject(i);
-
-            resultStrs[i] = new trailerReviews(
-                    REVIEW,
-                    singleReview.getString(RVW_ID),
-                    singleReview.getString(RVW_URL),
-                    singleReview.getString(RVW_AUTHOR));
-
-        }
-
-        return resultStrs;
 
     }
 
@@ -757,7 +632,7 @@ populateResult(result);
 
 
                 Uri builtUri = Uri.parse(MOVIE_BASE_URL).buildUpon()
-                        .appendPath(movieId)
+                        .appendPath(mMovieId)
                         .appendPath(TRAILER_PARAM)
                         .appendQueryParameter(API_ID_PARAM, apiId)
                         .build();
@@ -837,28 +712,19 @@ populateResult(result);
         protected void onPostExecute(trailerReviews[] result) {
             if (result != null) {
 
-                if (mReviews != null) {
-                    for (int i = 0; i < mReviews.length; i++) {
-                        mReviews[i] = null;
-                    }
+                for (trailerReviews singleReview : result) {
+                    mtrailerReviewsAdapter.add(singleReview);
                 }
-
-                mReviews = result;
-
-                //   mtrailerReviews = concat(mHeader, mTrailer, mReviews);
-                Log.v(LOG_TAG, "TReview Array: " + mReviews);
-
-             /*   if (mtrailerReviews != null) {
-            //        mtrailerReviewsAdapter.clear();
-                    for (trailerReviews singletrailerReview : mtrailerReviews) {
-                        mtrailerReviewsAdapter.add(singletrailerReview);
-                    }
-
-                    //for (reviewInfo singleReview : result) {
-                    //      mTrailerInfo.add(singleTrailer);
-
-                }*/
             }
+
+
+            Log.v("Post Execute Review", "Count of Review items = " + result.length);
+            if (mShareActionProvider != null) {
+                mShareActionProvider.setShareIntent(createShareTrailerIntent());
+            }
+            mtrailerReviewsAdapter.notifyDataSetChanged();
+
+
         }
     }
 }

@@ -9,6 +9,10 @@ import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.net.Uri;
 import android.provider.BaseColumns;
+import android.util.Log;
+
+import com.example.android.popularmovies.MovieFragment;
+import com.example.android.popularmovies.R;
 
 
 /**
@@ -16,12 +20,14 @@ import android.provider.BaseColumns;
  */
 public class MovieContract {
 
-
     public static final String CONTENT_AUTHORITY = "com.example.android.popularmovies";
     public static final Uri BASE_CONTENT_URI = Uri.parse("content://" + CONTENT_AUTHORITY);
-
     public static final String PATH_MOVIE = "movieList";
-    public static final String PATH_TRAILER_REVIEWS = "trailerReviewDb";
+    public static final String PATH_HIGHESTRATEDMOVIES = "highestRatedMoviesDb";
+    public static final String PATH_FAVORITEMOVIES = "favoriteMoviesDb";
+    private static final String LOG_TAG = MovieContract.class.getSimpleName();
+
+   /* public static final String PATH_TRAILER_REVIEWS = "trailerReviewDb";
 
 
 
@@ -43,13 +49,13 @@ public class MovieContract {
 
         // Column with the foreign key into the trailerReview table.
         //Original Movie Id as provided by themoviedb.org
-        public static final String COLUMN_MOVIE_ID = "id"; /* To be implemneted */
+        public static final String COLUMN_MOVIE_ID = "id";
 
         // Type of Entry 0 = TRAILER 1 = REVIEW of Movie, Stored as int
         public static final String COLUMN_TYPE = "type";
 
         // YouTube video Key or unique key of review, Stored as String
-        public static final String COLUMN_KEY = "key"; /* To rename id to key in adapter */
+        public static final String COLUMN_KEY = "key";
 
         // Site for trailer or url of review - Stored as String
         public static final String COLUMN_URL = "url";
@@ -61,15 +67,11 @@ public class MovieContract {
             return ContentUris.withAppendedId(CONTENT_URI, id);
         }
 
-    }
+    }*/
 
-
-
-
-    /* Inner class that defines the table contents of the weather table */
     public static final class MovieListEntry implements BaseColumns {
 
-
+        //to rename this as highestRatedMovies
         public static final Uri CONTENT_URI =
                 BASE_CONTENT_URI.buildUpon().appendPath(PATH_MOVIE).build();
 
@@ -77,7 +79,6 @@ public class MovieContract {
                 ContentResolver.CURSOR_DIR_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_MOVIE;
         public static final String CONTENT_ITEM_TYPE =
                 ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_MOVIE;
-
 
         //Table Name
 
@@ -108,43 +109,160 @@ public class MovieContract {
         public static Uri buildMovieListUri() {
             return MovieListEntry.CONTENT_URI;
 
-         //yy    return ContentUris.withAppendedId(CONTENT_URI, id);
         }
 
 
+        public static Uri buildMovieListSort(String sortType) {
+            String sortOrder = null;
+
+            // if (sortType.equals(getActivity().getString(R.string.pref_sort_popular))) {
+            if (sortType.equals("mostPopular")) {
+                sortOrder = MovieContract.MovieListEntry.COLUMN_POPULARITY + " ASC";
+                Log.v(LOG_TAG, "Sort: Order Popular" + sortOrder);
+                // } else if (sortType.equals(getActivity().getString(R.string.pref_sort_highestrated))) {
+            } else if (sortType.equals("highestRated")) {
+                sortOrder = MovieContract.MovieListEntry.COLUMN_USER_RATING + " DESC";
+                Log.v(LOG_TAG, "Sort: Order Popular" + sortOrder);
+                // } else if (sortType.equals(getActivity().getString(R.string.pref_sort_favourite))) {
+            } else if (sortType.equals("favouRite")) {
+                Log.v(LOG_TAG, "Sort: Order Favorite");
+                //TODO routine for Favorite
+            } else {
+                Log.d(LOG_TAG, "Sort Order Not Found:" + sortType);
+            }
+
+
+            //   Uri movieListFromDBQueryUri = MovieContract.MovieListEntry.buildMovieListUri();
+            return CONTENT_URI.buildUpon().appendPath(sortOrder).build();
+        }
+
+        public static Uri selectedMovieQuery(String movieId) {
+            return CONTENT_URI.buildUpon().appendPath(movieId).build();
+        }
 
         public static Uri buildMovieTrailerReviews(String movieId) {
             return CONTENT_URI.buildUpon().appendPath(movieId).build();
         }
-/*
-            Student: Fill in this buildWeatherLocation function
-        public static Uri buildWeatherLocationWithStartDate(
-                String locationSetting, long startDate) {
-            long normalizedDate = normalizeDate(startDate);
-            return CONTENT_URI.buildUpon().appendPath(locationSetting)
-                    .appendQueryParameter(COLUMN_DATE, Long.toString(normalizedDate)).build();
-        }
 
-        public static Uri buildWeatherLocationWithDate(String locationSetting, long date) {
-            return CONTENT_URI.buildUpon().appendPath(locationSetting)
-                    .appendPath(Long.toString(normalizeDate(date))).build();
-        }
-
-        public static String getLocationSettingFromUri(Uri uri) {
+        public static String getMovieIdFromUri(Uri uri) {
             return uri.getPathSegments().get(1);
         }
 
-        public static long getDateFromUri(Uri uri) {
-            return Long.parseLong(uri.getPathSegments().get(2));
+    }
+
+    public static final class HighestRatedMovies implements BaseColumns {
+
+
+        public static final Uri CONTENT_URI =
+                BASE_CONTENT_URI.buildUpon().appendPath(PATH_HIGHESTRATEDMOVIES).build();
+
+        public static final String CONTENT_TYPE =
+                ContentResolver.CURSOR_DIR_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_HIGHESTRATEDMOVIES;
+        public static final String CONTENT_ITEM_TYPE =
+                ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_HIGHESTRATEDMOVIES;
+
+        //Table Name
+
+        public static final String TABLE_NAME = "highestRatedMoviesDb";
+
+        // Column with the foreign key into the TrailerReviewDb table.
+        //Original Movie Id as provided by themoviedb.org Stored As String
+        public static final String COLUMN_MOVIE_ID = "id";
+
+        // Popularity of Movie Stored as int
+        public static final String COLUMN_POPULARITY = "popularity";
+
+        // Original Title of Movie Stored as String
+        public static final String COLUMN_ORIGINAL_TITLE = "original_title";
+
+        // Plot Synopsis of Movie Stored as String
+        public static final String COLUMN_PLOT_SYNOPSIS = "plot_synopsis";
+
+        // User rating of Movie Stored as Double
+        public static final String COLUMN_USER_RATING = "user_rating";
+
+        // Release Date of Movie Stored as String
+        public static final String COLUMN_RELEASE_DATE = "release_date";
+
+        // Path of Poster Thumbnail of Movie  as returned by API, to identify the thumbnail to be used
+        public static final String COLUMN_POSTER_PATH_THUMBNAIL = "poster_path_thumbnail";
+
+        public static Uri buildMovieListUri() {
+            return HighestRatedMovies.CONTENT_URI;
+
         }
 
-        public static long getStartDateFromUri(Uri uri) {
-            String dateString = uri.getQueryParameter(COLUMN_DATE);
-            if (null != dateString && dateString.length() > 0)
-                return Long.parseLong(dateString);
-            else
-                return 0;
+        public static Uri selectedMovieQuery(String movieId) {
+            return CONTENT_URI.buildUpon().appendPath(movieId).build();
         }
-*/
+
+        public static Uri buildMovieTrailerReviews(String movieId) {
+            return CONTENT_URI.buildUpon().appendPath(movieId).build();
+        }
+
+        public static String getMovieIdFromUri(Uri uri) {
+            return uri.getPathSegments().get(1);
+        }
     }
+
+    public static final class FavoriteMovies implements BaseColumns {
+
+
+        public static final Uri CONTENT_URI =
+                BASE_CONTENT_URI.buildUpon().appendPath(PATH_FAVORITEMOVIES).build();
+
+        public static final String CONTENT_TYPE =
+                ContentResolver.CURSOR_DIR_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_FAVORITEMOVIES;
+        public static final String CONTENT_ITEM_TYPE =
+                ContentResolver.CURSOR_ITEM_BASE_TYPE + "/" + CONTENT_AUTHORITY + "/" + PATH_FAVORITEMOVIES;
+
+        //Table Name
+
+        public static final String TABLE_NAME = "favoriteMoviesDb";
+
+        // Column with the foreign key into the TrailerReviewDb table.
+        //Original Movie Id as provided by themoviedb.org Stored As String
+        public static final String COLUMN_MOVIE_ID = "id";
+
+        // Popularity of Movie Stored as int
+        public static final String COLUMN_POPULARITY = "popularity";
+
+        // Original Title of Movie Stored as String
+        public static final String COLUMN_ORIGINAL_TITLE = "original_title";
+
+        // Plot Synopsis of Movie Stored as String
+        public static final String COLUMN_PLOT_SYNOPSIS = "plot_synopsis";
+
+        // User rating of Movie Stored as Double
+        public static final String COLUMN_USER_RATING = "user_rating";
+
+        // Release Date of Movie Stored as String
+        public static final String COLUMN_RELEASE_DATE = "release_date";
+
+        // Path of Poster Thumbnail of Movie  as returned by API, to identify the thumbnail to be used
+        public static final String COLUMN_POSTER_PATH_THUMBNAIL = "poster_path_thumbnail";
+
+        public static Uri buildMovieListUri() {
+            return FavoriteMovies.CONTENT_URI;
+
+        }
+
+        public static Uri selectedMovieQuery(String movieId) {
+            return CONTENT_URI.buildUpon().appendPath(movieId).build();
+        }
+
+        public static Uri buildMovieTrailerReviews(String movieId) {
+            return CONTENT_URI.buildUpon().appendPath(movieId).build();
+        }
+
+        public static String getMovieIdFromUri(Uri uri) {
+            return uri.getPathSegments().get(1);
+        }
+    }
+
+
 }
+
+
+
+
