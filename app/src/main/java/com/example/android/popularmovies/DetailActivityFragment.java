@@ -306,7 +306,8 @@ public class DetailActivityFragment extends Fragment{
 
     void onSortOrderChanged() {
         // replace the uri, since the sort order has changed
-        mUri = Utility.getUriOfFirstMovieInPreferredSortOrder(getContext());
+        mUri = Utility.getUriOfFirstMovieInPreferredSortOrder(getActivity());
+        //     mUri = Utility.getUriOfFirstMovieInPreferredSortOrder(getContext());
         if (null != mUri) {
 
             //   Uri updatedUri = MovieContract.MovieListEntry.buildMovieListSort(newSortType);
@@ -325,7 +326,9 @@ public class DetailActivityFragment extends Fragment{
         if (null != uri) {
 
             //   Uri updatedUri = MovieContract.MovieListEntry.buildMovieListSort(newSortType);
-            Uri updatedUri = getUriBasedOnPreferredSortOrder(getContext());
+            Uri updatedUri = getUriBasedOnPreferredSortOrder(getActivity());
+//            Uri updatedUri = getUriBasedOnPreferredSortOrder(getContext());
+
             mUri = updatedUri;
             Log.v(LOG_TAG, "XYZ Entered detail activity sort order" + mUri);
             //  getLoaderManager().restartLoader(DETAIL_LOADER, null, this);
