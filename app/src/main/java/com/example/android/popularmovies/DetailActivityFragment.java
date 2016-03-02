@@ -194,7 +194,6 @@ public class DetailActivityFragment extends Fragment{
 
                 trailerReviews trailerReviewData = (trailerReviews) adapterView.getItemAtPosition(position);
 
-                //    Toast.makeText(getActivity(), "Item at Position #" + trailerReviewData.id + "# Clicked.", Toast.LENGTH_SHORT).show();
 
                 if (trailerReviewData != null && trailerReviewData.type == TRAILER) {
 
